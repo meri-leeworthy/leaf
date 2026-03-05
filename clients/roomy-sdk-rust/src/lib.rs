@@ -15,7 +15,10 @@ pub mod events;
 pub use atproto::RoomyAtpClient;
 pub use client::{RoomyClient, RoomyClientConfig};
 pub use connection::ConnectedSpace;
-pub use events::{Event, EventType};
+pub use events::{Event, EventType, Ulid};
+
+// Re-export from leaf-client-rust
+pub use leaf_client_rust::Did;
 
 /// Result type alias for Roomy SDK operations
 pub type Result<T> = std::result::Result<T, Error>;

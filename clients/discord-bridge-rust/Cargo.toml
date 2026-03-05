@@ -1,0 +1,55 @@
+[package]
+name = "discord-bridge-rust"
+version = "0.1.0"
+edition = "2024"
+authors = ["Muni Town"]
+license = "MPL-2.0"
+repository = "https://github.com/muni-town/leaf"
+description = "Discord bridge for Roomy - Bidirectional sync between Discord guilds and Roomy spaces"
+keywords = ["discord", "atproto", "roomy", "bridge"]
+categories = ["network-programming", "web-programming"]
+
+[dependencies]
+# Discord library
+twilight-gateway = "0.15"
+twilight-http = "0.15"
+twilight-model = "0.15"
+
+# Database
+sled = "0.34"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full", "tracing"] }
+tokio-stream = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ciborium = "0.2"
+
+# Identifiers
+ulid = "1.2"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-futures = "0.2"
+
+# Caching
+lru = "0.12"
+
+# Local workspace dependencies
+roomy-sdk-rust = { path = "../roomy-sdk-rust" }
+leaf-client-rust = { path = "../leaf-client-rust" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+dotenv = "0.15"
+
+[[bin]]
+name = "discord-bridge"
+path = "src/main.rs"
