@@ -97,17 +97,50 @@ let did = Did::new("invalid".to_string())?;
 
 ## 🔬 Development
 
+### Quick Start Testing
+
+```bash
+cd leaf
+
+# Unit tests (no server required)
+cargo test -p leaf-client-rust --lib
+
+# Integration tests (requires running server)
+cargo test -p leaf-client-rust --test integration_test -- --ignored
+
+# Run all tests with helper script
+./clients/leaf-client-rust/scripts/test.sh all
+```
+
+### Documentation
+
+- 📖 [Full Testing Guide](TESTING.md) - Comprehensive testing documentation
+- ⚡ [Quick Reference](TEST_QUICKREF.md) - Quick command reference
+- 📊 [Progress Tracking](PROGRESS.md) - Development progress
+- ✅ [Phase 2 Complete](PHASE2_COMPLETE.md) - Implementation details
+
 ### Run Tests
 
 ```bash
 cd leaf
-cargo test -p leaf-client-rust
+
+# Unit tests only
+cargo test -p leaf-client-rust --lib
+
+# Integration tests (requires server)
+cargo test -p leaf-client-rust --test integration_test -- --ignored
+
+# Using helper script
+./clients/leaf-client-rust/scripts/test.sh unit       # Unit tests
+./clients/leaf-client-rust/scripts/test.sh integration # Integration tests
+./clients/leaf-client-rust/scripts/test.sh all        # All tests
 ```
 
-### Run Example
+### Run Examples
 
 ```bash
 cargo run -p leaf-client-rust --example cbor_demo
+cargo run -p leaf-client-rust --example client_demo
 ```
 
 ### Run Benchmarks
