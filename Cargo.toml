@@ -6,6 +6,7 @@ members = [
     "leaf-server",
     "leaf-stream-types",
     "clients/leaf-client-rust",
+    "clients/roomy-sdk-rust",
 ]
 
 [workspace.package]
