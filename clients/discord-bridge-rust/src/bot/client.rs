@@ -1,9 +1,10 @@
 //! Discord bot client wrapper
 
 use twilight_gateway::{
-    stream::{ShardEventStream, StreamExt},
-    Intents, Shard,
+    stream::ShardEventStream,
+    Intents, Shard, ShardId,
 };
+use futures::StreamExt;
 use twilight_http::Client;
 use twilight_model::gateway::event::Event;
 use std::sync::Arc;
@@ -36,7 +37,7 @@ impl DiscordBot {
         let http = Arc::new(Client::new(token.clone()));
 
         // Get bot user info
-        let current_user = http.current_user().exec().await?.model().await?;
+        let current_user = http.current_user().await?.model().await?;
         let bot_id = current_user.id.get();
 
         // Create event channel
@@ -53,34 +54,37 @@ impl DiscordBot {
             | Intents::GUILD_MESSAGE_REACTIONS;
 
         // Create shard
-        let shard = Shard::new(token, intents);
+        let mut shard = Shard::new(ShardId::ONE, token, intents);
 
         // Spawn gateway event handler
         let http_clone = Arc::clone(&http);
+        let event_tx_clone = event_tx.clone();
         tokio::spawn(async move {
-            Self::run_gateway(shard, http_clone, event_tx).await;
+            Self::run_gateway(&mut shard, http_clone, event_tx_clone).await;
         });
 
-        Ok(Self {
+        Ok((Self {
             http,
             id: bot_id,
             event_rx,
-        })
+        }, event_tx))
     }
 
     /// Run the gateway event loop
     async fn run_gateway(
-        mut shard: Shard,
+        shard: &mut Shard,
         http: Arc<Client>,
         event_tx: mpsc::Sender<DiscordEvent>,
     ) {
-        let mut stream = ShardEventStream::new(shard.info());
+        let mut stream = ShardEventStream::new(std::iter::once(shard));
 
-        while let Some(event) = stream.next().await {
-            let event = match event {
+        while let Some(item) = stream.next().await {
+            let (_shard_ref, event_result) = item;
+
+            let event = match event_result {
                 Ok(event) => event,
                 Err(source) => {
-                    tracing::error!("error receiving event: {:?}", source);
+                    tracing::error!("error processing event: {:?}", source);
                     continue;
                 }
             };
@@ -94,16 +98,36 @@ impl DiscordBot {
         }
     }
 
+    /// Convert Twilight ReactionType to our custom ReactionType
+    fn convert_reaction_type(emoji: &twilight_model::channel::message::ReactionType) -> crate::bot::events::ReactionType {
+        match emoji {
+            twilight_model::channel::message::ReactionType::Unicode { name } => {
+                crate::bot::events::ReactionType::Unicode {
+                    name: name.clone(),
+                }
+            }
+            twilight_model::channel::message::ReactionType::Custom {
+                id,
+                name,
+                animated,
+            } => crate::bot::events::ReactionType::Custom {
+                id: id.get(),
+                name: name.clone(),
+                animated: *animated,
+            },
+        }
+    }
+
     /// Convert Twilight event to our DiscordEvent
     async fn convert_event(event: &Event, _http: &Client) -> Option<DiscordEvent> {
         match event {
             // Message created
             Event::MessageCreate(msg) => {
-                let guild_id = msg.0.guild_id;
+                let guild_id = msg.guild_id;
                 Some(DiscordEvent::MessageCreate(
                     crate::bot::MessageCreatePayload {
                         guild_id,
-                        channel_id: msg.0.channel_id,
+                        channel_id: msg.channel_id,
                         message: msg.0.clone(),
                     },
                 ))
@@ -111,7 +135,7 @@ impl DiscordBot {
 
             // Message updated
             Event::MessageUpdate(msg) => {
-                let guild_id = msg.0.guild_id;
+                let _guild_id = msg.guild_id;
                 // For updates, we need to fetch the full message
                 // TODO: Implement message fetching
                 None
@@ -119,47 +143,47 @@ impl DiscordBot {
 
             // Message deleted
             Event::MessageDelete(msg) => {
-                let guild_id = msg.0.guild_id;
+                let guild_id = msg.guild_id;
                 Some(DiscordEvent::MessageDelete(
                     crate::bot::MessageDeletePayload {
                         guild_id,
-                        channel_id: msg.0.channel_id,
-                        message_id: msg.0.id,
+                        channel_id: msg.channel_id,
+                        message_id: msg.id,
                     },
                 ))
             }
 
             // Reaction added
             Event::ReactionAdd(reaction) => {
-                let guild_id = reaction.0.guild_id;
+                let guild_id = reaction.guild_id;
                 Some(DiscordEvent::ReactionAdd(
                     crate::bot::ReactionAddPayload {
                         guild_id,
-                        channel_id: reaction.0.channel_id,
-                        message_id: reaction.0.message_id,
-                        user_id: reaction.0.user_id,
-                        emoji: reaction.0.emoji.clone(),
+                        channel_id: reaction.channel_id,
+                        message_id: reaction.message_id,
+                        user_id: reaction.user_id,
+                        emoji: Self::convert_reaction_type(&reaction.emoji),
                     },
                 ))
             }
 
             // Reaction removed
             Event::ReactionRemove(reaction) => {
-                let guild_id = reaction.0.guild_id;
+                let guild_id = reaction.guild_id;
                 Some(DiscordEvent::ReactionRemove(
                     crate::bot::ReactionRemovePayload {
                         guild_id,
-                        channel_id: reaction.0.channel_id,
-                        message_id: reaction.0.message_id,
-                        user_id: reaction.0.user_id,
-                        emoji: reaction.0.emoji.clone(),
+                        channel_id: reaction.channel_id,
+                        message_id: reaction.message_id,
+                        user_id: reaction.user_id,
+                        emoji: Self::convert_reaction_type(&reaction.emoji),
                     },
                 ))
             }
 
             // Channel created
             Event::ChannelCreate(channel) => {
-                let guild_id = channel.0.guild_id;
+                let guild_id = channel.guild_id;
                 Some(DiscordEvent::ChannelCreate(
                     crate::bot::ChannelCreatePayload {
                         guild_id,
@@ -170,13 +194,13 @@ impl DiscordBot {
 
             // Thread created
             Event::ThreadCreate(thread) => {
-                let guild_id = thread.0.guild_id;
-                let parent_id = thread.0.parent_id?;
+                let guild_id = thread.guild_id;
+                let parent_id = thread.parent_id;
                 Some(DiscordEvent::ThreadCreate(
                     crate::bot::ThreadCreatePayload {
                         guild_id,
                         channel: thread.0.clone(),
-                        parent_id,
+                        parent_id: parent_id.unwrap(),
                     },
                 ))
             }

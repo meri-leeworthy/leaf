@@ -6,8 +6,8 @@ use roomy_sdk_rust::Did;
 
 /// Bridge for a single guild-space pair
 pub struct Bridge {
-    guild_id: Id<GuildMarker>,
-    space_did: Did,
+    _guild_id: Id<GuildMarker>,
+    _space_did: Did,
 }
 
 impl Bridge {
@@ -17,8 +17,8 @@ impl Bridge {
         space_did: Did,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            guild_id,
-            space_did,
+            _guild_id: guild_id,
+            _space_did: space_did,
         })
     }
 }

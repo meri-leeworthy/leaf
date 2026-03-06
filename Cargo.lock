@@ -1375,8 +1375,11 @@ name = "discord-bridge-rust"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "blake3",
  "ciborium",
  "dotenv",
+ "futures",
  "leaf-client-rust",
  "lru",
  "roomy-sdk-rust",

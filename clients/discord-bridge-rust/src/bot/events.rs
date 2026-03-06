@@ -2,10 +2,15 @@
 
 use twilight_model::{
     channel::{Channel, Message},
-    gateway::payload::incoming::{ReactionAdd, ReactionRemove},
-    guild::ReactionType,
     id::{marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker}, Id},
 };
+
+/// Simplified reaction type for our purposes
+#[derive(Debug, Clone)]
+pub enum ReactionType {
+    Unicode { name: String },
+    Custom { id: u64, name: Option<String>, animated: bool },
+}
 
 /// Discord events we handle
 #[derive(Debug, Clone)]
@@ -68,7 +73,7 @@ pub struct MessageUpdatePayload {
 pub struct MessageDeletePayload {
     pub guild_id: Option<Id<GuildMarker>>,
     pub channel_id: Id<ChannelMarker>,
-    pub message_id: Id<ChannelMarker>,
+    pub message_id: Id<MessageMarker>,
 }
 
 /// Payload for REACTION_ADD event

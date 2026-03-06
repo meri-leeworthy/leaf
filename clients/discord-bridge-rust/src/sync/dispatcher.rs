@@ -54,9 +54,11 @@ impl EventDispatcher {
     }
 
     /// Close the dispatcher channels (signal shutdown)
-    pub fn close(&self) {
+    ///
+    /// Consumes the dispatcher to drop the senders and close the channels.
+    pub fn close(self) {
         // Drop the senders to close the channels
-        drop(&self.to_roomy);
-        drop(&self.to_discord);
+        drop(self.to_roomy);
+        drop(self.to_discord);
     }
 }
