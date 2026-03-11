@@ -457,20 +457,27 @@ impl LeafClient {
     }
 
     /// Emit an event and wait for acknowledgement
+    ///
+    /// Note: The server uses socketioxide with msgpack parser. However, testing shows
+    /// that the parser works at the Socket.IO packet level, not the payload level.
+    /// We send CBOR data directly and the server decodes it with dasl (CBOR decoder).
     async fn emit_with_ack(&self, event: &str, payload: Vec<u8>) -> Result<Vec<u8>> {
         use std::time::Duration;
+
+        debug!("Sending {} bytes of CBOR data for event {}", payload.len(), event);
 
         // Create a channel to receive the ack response
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
 
         let callback = move |payload: Payload, _client: Client| {
             if let Payload::Binary(data) = payload {
+                debug!("Received {} bytes of response data", data.len());
                 let _ = tx.send(data.to_vec());
             }
             futures::future::ready::<()>(()).boxed()
         };
 
-        // Send with ack
+        // Send with ack - pass CBOR data directly
         self.socket
             .emit_with_ack(
                 event,
@@ -481,17 +488,55 @@ impl LeafClient {
             .await
             .map_err(|e| LeafClientError::Socket(format!("Emit failed: {}", e)))?;
 
+        debug!("Emit successful, waiting for ack...");
+
         // Wait for response
-        rx.recv()
-            .await
-            .ok_or_else(|| LeafClientError::Socket("No response received".to_string()))
+        match tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
+            Ok(Some(data)) => {
+                debug!("Received {} bytes of ack data", data.len());
+                Ok(data)
+            }
+            Ok(None) => {
+                Err(LeafClientError::Socket("Channel closed".to_string()))
+            }
+            Err(_) => {
+                Err(LeafClientError::Socket("Timeout waiting for response".to_string()))
+            }
+        }
     }
 
     /// Disconnect from the server
+    ///
+    /// Note: This is lenient about disconnect errors. If the socket is already
+    /// closed or the connection was lost, this returns Ok(()) rather than an error.
+    /// This matches the TypeScript client's fire-and-forget behavior.
     pub async fn disconnect(self) -> Result<()> {
-        self.socket
-            .disconnect()
-            .await
-            .map_err(|e| LeafClientError::Socket(format!("Disconnect failed: {}", e)))
+        match self.socket.disconnect().await {
+            Ok(_) => {
+                debug!("Disconnect succeeded");
+                Ok(())
+            }
+            Err(e) => {
+                let err_msg = format!("{:?}", e); // Debug format to see full error structure
+                debug!("Disconnect returned error: {}", err_msg);
+
+                // Check if this is a benign error related to connection being closed
+                // The error can be:
+                // - EngineIO Error (wrapper for underlying issues)
+                // - IncompleteResponseFromEngineIo(WebsocketError(AlreadyClosed))
+                // - IncompleteResponseFromEngineIo(WebsocketError(Protocol(SendAfterClosing)))
+                if err_msg.contains("AlreadyClosed")
+                    || err_msg.contains("SendAfterClosing")
+                    || err_msg.contains("IncompleteResponseFromEngineIo")
+                    || err_msg.contains("EngineIO Error")
+                {
+                    debug!("Treating disconnect error as benign (connection already closed)");
+                    Ok(())
+                } else {
+                    // Other errors are still real errors
+                    Err(LeafClientError::Socket(format!("Disconnect failed: {:?}", e)))
+                }
+            }
+        }
     }
 }
