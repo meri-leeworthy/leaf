@@ -7,7 +7,7 @@ members = [
     "leaf-stream-types",
     "clients/leaf-client-rust",
     "clients/roomy-sdk-rust",
-    "clients/discord-bridge-rust",
+    "clients/discord-bridge-rust", "clients/socketio-rust",
 ]
 
 [workspace.package]

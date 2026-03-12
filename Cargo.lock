@@ -6034,6 +6034,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "socketio-rust"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "ciborium",
+ "futures-util",
+ "reqwest",
+ "rmp-serde",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-tungstenite 0.26.2",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "socketioxide"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
